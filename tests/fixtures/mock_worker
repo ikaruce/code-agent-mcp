@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Mock code-agent CLI for tests. Symlinked as opencode, codex, claude in
+# tests/fixtures/bin/. Detects its own $0 to determine role and extract the
+# prompt from argv.
+#
+# Env vars (all optional):
+#   CAM_TEST_SLEEP  — seconds to sleep before writing (default 0)
+#   CAM_TEST_EXIT   — exit code (default 0)
+#   CAM_TEST_MSG    — stdout body (default: "MOCK_OK: <prompt>")
+#   CAM_TEST_STDERR — stderr body (default: empty)
+#
+# Argv parsing:
+#   $0 basename == "opencode":  opencode run <prompt>
+#   $0 basename == "codex":     codex exec <prompt> -C <cwd> -s read-only
+#   $0 basename == "claude":    claude -p <prompt>
+
+set -u
+
+self_name=$(basename "$0")
+
+case "$self_name" in
+  opencode)
+    # $1 = "run", $2 = prompt
+    prompt="${2:-}"
+    ;;
+  codex)
+    # $1 = "exec", $2 = prompt
+    prompt="${2:-}"
+    ;;
+  claude)
+    # $1 = "-p", $2 = prompt
+    prompt="${2:-}"
+    ;;
+  *)
+    prompt="mock:unknown-role:$*"
+    ;;
+esac
+
+sleep_s="${CAM_TEST_SLEEP:-0}"
+exit_code="${CAM_TEST_EXIT:-0}"
+stdout_msg="${CAM_TEST_MSG:-MOCK_OK: ${prompt}}"
+stderr_msg="${CAM_TEST_STDERR:-}"
+
+if [ "$sleep_s" != "0" ]; then
+  sleep "$sleep_s"
+fi
+
+printf '%s\n' "$stdout_msg"
+if [ -n "$stderr_msg" ]; then
+  printf '%s\n' "$stderr_msg" >&2
+fi
+
+exit "$exit_code"

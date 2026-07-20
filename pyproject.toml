@@ -1,0 +1,32 @@
+[project]
+name = "code-agent-mcp"
+version = "0.1.0"
+description = "MCP delegation socket — fan out code subtasks from expensive drivers (Claude/Codex) to cheap local workers (OpenCode)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary — internal use only" }
+authors = [{ name = "blue" }]
+dependencies = [
+    "mcp>=1.2.0",
+]
+
+[project.scripts]
+code-agent-mcp = "code_agent_mcp.server:main"
+code-agent-mcp-export = "code_agent_mcp.export:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["code_agent_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
