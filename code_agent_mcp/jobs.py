@@ -74,7 +74,7 @@ class JobStore:
         _ensure_dirs()
         # Lazy default so monkeypatched jobs_mod.DB_PATH is honored by tests.
         self.db_path = db_path if db_path is not None else DB_PATH
-        self._conn = sqlite3.connect(str(db_path), isolation_level=None)
+        self._conn = sqlite3.connect(str(self.db_path), isolation_level=None)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(SCHEMA)
         self._lock = asyncio.Lock()
