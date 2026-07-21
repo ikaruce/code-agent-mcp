@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .base import BaseAdapter
+from .base import BaseAdapter, resolve_cli
 
 
 class CodexAdapter(BaseAdapter):
@@ -15,8 +15,8 @@ class CodexAdapter(BaseAdapter):
         cwd: str,
         prompt_file: Path | None,
     ) -> list[str]:
-        return [
-            "codex",
+        # resolve_cli handles Windows .ps1 wrappers (npm-installed CLIs).
+        return resolve_cli("codex") + [
             "exec",
             prompt_with_preamble,
             "-C",

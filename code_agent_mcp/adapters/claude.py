@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .base import BaseAdapter
+from .base import BaseAdapter, resolve_cli
 
 
 class ClaudeAdapter(BaseAdapter):
@@ -17,4 +17,5 @@ class ClaudeAdapter(BaseAdapter):
     ) -> list[str]:
         # claude -p <prompt>  — -p/--print is non-interactive flag, prompt is positional.
         # Working dir set via subprocess cwd=.
-        return ["claude", "-p", prompt_with_preamble]
+        # resolve_cli handles Windows .ps1 wrappers (npm-installed CLIs).
+        return resolve_cli("claude") + ["-p", prompt_with_preamble]

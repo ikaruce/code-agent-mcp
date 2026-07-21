@@ -1,11 +1,48 @@
 from __future__ import annotations
 
+import shutil
+import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
 
 
 PER_FILE_CAP_BYTES = 8 * 1024
 TOTAL_PREAMBLE_CAP_BYTES = 64 * 1024
+
+
+def resolve_cli(name: str) -> list[str]:
+    """Resolve a CLI command name to an argv prefix.
+
+    Unix: returns [name] and lets subprocess use PATH resolution.
+    Windows: uses shutil.which() to locate the actual executable. If the
+             discovered file is a PowerShell script (.ps1) — as produced
+             by some npm-installed CLIs — wraps the call with
+             `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <path>`
+             because CreateProcess cannot execute .ps1 directly. For .cmd,
+             .bat, and .exe files, returns the resolved absolute path so
+             CreateProcess picks the right shim.
+
+    Falls back to [name] when not found so the caller gets a clear
+    FileNotFoundError instead of a confusing partial argv.
+    """
+    if sys.platform != "win32":
+        return [name]
+
+    path = shutil.which(name)
+    if path is None:
+        return [name]
+
+    p = Path(path)
+    if p.suffix.lower() == ".ps1":
+        return [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(p),
+        ]
+    return [str(p)]
 
 
 class ContextFileMissingError(FileNotFoundError):

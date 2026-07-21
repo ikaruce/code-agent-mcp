@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .base import BaseAdapter
+from .base import BaseAdapter, resolve_cli
 
 
 class OpenCodeAdapter(BaseAdapter):
@@ -16,4 +16,5 @@ class OpenCodeAdapter(BaseAdapter):
         prompt_file: Path | None,
     ) -> list[str]:
         # opencode run <message>  — prompt is positional. Working dir set via subprocess cwd=.
-        return ["opencode", "run", prompt_with_preamble]
+        # resolve_cli handles Windows .ps1 wrappers (npm-installed CLIs).
+        return resolve_cli("opencode") + ["run", prompt_with_preamble]

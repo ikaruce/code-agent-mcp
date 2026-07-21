@@ -10,6 +10,8 @@ Mid-month, expensive-model credits run out. You start splitting tasks manually a
 
 Requires Python 3.11+ and each supported worker CLI already on PATH (`opencode`, `codex`, `claude`).
 
+**Windows note:** npm-installed CLIs on Windows are often shipped as PowerShell (`.ps1`) shims. This server auto-detects `.ps1` files via `shutil.which()` and invokes them through `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <path>`, so `subprocess.exec` can launch them correctly. `.cmd` / `.bat` / `.exe` shims work unchanged.
+
 ```bash
 uvx --from git+ssh://git@github.com/<org>/code-agent-mcp.git code-agent-mcp
 ```
