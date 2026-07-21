@@ -24,6 +24,12 @@ PER_AGENT_CAPS = {"opencode": 4, "codex": 2, "claude": 2, "gemini": 2}
 TERMINAL_STATES = {"done", "error", "cancelled"}
 SIGKILL_GRACE_SECONDS = 5
 
+# Max characters retained in the `jobs.prompt_preview` column. Chosen after
+# early dogfooding showed 200 chars often truncated meaningful context
+# (typical dispatch prompts include instructions + reference lines that push
+# past 200 before the point of the task becomes visible in list_jobs).
+PROMPT_PREVIEW_MAX_CHARS = 500
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -100,7 +106,7 @@ class JobStore:
             self._conn.execute(
                 "INSERT INTO jobs (job_id, agent, state, cwd, prompt_preview, dispatched_at, timeout_ms) "
                 "VALUES (?, ?, 'pending', ?, ?, ?, ?)",
-                (job_id, agent, cwd, prompt_preview[:200], _now_iso(), timeout_ms),
+                (job_id, agent, cwd, prompt_preview[:PROMPT_PREVIEW_MAX_CHARS], _now_iso(), timeout_ms),
             )
         return job_id
 
