@@ -8,6 +8,7 @@ from code_agent_mcp.adapters import base as base_mod
 from code_agent_mcp.adapters.base import resolve_cli
 from code_agent_mcp.adapters.claude import ClaudeAdapter
 from code_agent_mcp.adapters.codex import CodexAdapter
+from code_agent_mcp.adapters.gemini import GeminiAdapter
 from code_agent_mcp.adapters.opencode import OpenCodeAdapter
 
 
@@ -44,13 +45,21 @@ def test_claude_argv_uses_print_flag():
     assert a.name == "claude"
 
 
+def test_gemini_argv_uses_stdin():
+    a = GeminiAdapter()
+    argv = a.build_argv("summarize", "/repo", None)
+    # Bare `gemini` with prompt on stdin. No subcommand, no positional prompt.
+    assert argv == ["gemini"]
+    assert a.input_mode == "stdin"
+    assert a.name == "gemini"
+
+
 def test_all_adapters_never_use_shell_true():
     """Regression: adapter argv is always a list of strings; prompt goes on stdin."""
     danger = "; rm -rf /; echo pwned"
-    for adapter in (OpenCodeAdapter(), CodexAdapter(), ClaudeAdapter()):
+    for adapter in (OpenCodeAdapter(), CodexAdapter(), ClaudeAdapter(), GeminiAdapter()):
         argv = adapter.build_argv(danger, "/tmp", None)
         assert isinstance(argv, list) and all(isinstance(x, str) for x in argv)
-        # Prompt must NOT be in argv (it flows via stdin) — shell injection surface is zero.
         assert danger not in argv
 
 
