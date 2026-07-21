@@ -44,6 +44,30 @@ async def _dispatch_and_wait(
 
 
 @pytest.mark.asyncio
+async def test_multiline_prompt_delivered_via_stdin(clean_env, tmp_path):
+    """Regression: multi-line prompts must survive the dispatch -> worker path intact.
+
+    User reported that codex was interpreting newlines as end-of-prompt when the
+    prompt was passed on argv. Switching to stdin fixes this. mock_worker reads
+    its prompt from stdin when a pipe is present and echoes 'MOCK_OK: <prompt>'.
+    """
+    multiline = "line one\nline TWO\nline three has  spaces\n"
+    store = JobStore()
+    scheduler = Scheduler(store=store, adapters=build_test_adapters())
+    await scheduler.start()
+    try:
+        job = await _dispatch_and_wait(
+            scheduler, store, "opencode", multiline, str(tmp_path)
+        )
+    finally:
+        await scheduler.stop()
+    assert job.state == "done"
+    stdout, _ = scheduler.read_output(job.job_id)
+    for line in ("line one", "line TWO", "line three has  spaces"):
+        assert line in stdout, f"missing line in stdout: {line!r}"
+
+
+@pytest.mark.asyncio
 async def test_happy_path_opencode(clean_env, tmp_path):
     store = JobStore()
     scheduler = Scheduler(store=store, adapters=build_test_adapters())

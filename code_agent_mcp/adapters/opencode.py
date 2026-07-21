@@ -8,6 +8,7 @@ from .base import BaseAdapter, resolve_cli
 class OpenCodeAdapter(BaseAdapter):
     name = "opencode"
     uses_prompt_file = False
+    input_mode = "stdin"
 
     def build_argv(
         self,
@@ -15,6 +16,6 @@ class OpenCodeAdapter(BaseAdapter):
         cwd: str,
         prompt_file: Path | None,
     ) -> list[str]:
-        # opencode run <message>  — prompt is positional. Working dir set via subprocess cwd=.
-        # resolve_cli handles Windows .ps1 wrappers (npm-installed CLIs).
-        return resolve_cli("opencode") + ["run", prompt_with_preamble]
+        # opencode reads prompt from stdin when no positional message is supplied.
+        # Working dir set via subprocess cwd=. resolve_cli handles Windows .ps1.
+        return resolve_cli("opencode") + ["run"]

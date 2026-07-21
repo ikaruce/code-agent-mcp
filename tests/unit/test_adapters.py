@@ -11,44 +11,47 @@ from code_agent_mcp.adapters.codex import CodexAdapter
 from code_agent_mcp.adapters.opencode import OpenCodeAdapter
 
 
-def test_opencode_argv_is_positional():
+def test_opencode_argv_omits_prompt_uses_stdin():
     a = OpenCodeAdapter()
     argv = a.build_argv("hello world", "/tmp/proj", None)
-    assert argv == ["opencode", "run", "hello world"]
-    assert a.uses_prompt_file is False
+    # Prompt delivered via stdin, not argv — avoids multi-line and size-limit bugs.
+    assert argv == ["opencode", "run"]
+    assert a.input_mode == "stdin"
     assert a.name == "opencode"
 
 
-def test_opencode_ignores_prompt_file_argument():
+def test_opencode_argv_stable_regardless_of_prompt_file_arg():
     a = OpenCodeAdapter()
     argv = a.build_argv("hi", "/tmp", Path("/tmp/prompt.md"))
-    # prompt_file is ignored because uses_prompt_file=False; the positional prompt wins.
-    assert argv == ["opencode", "run", "hi"]
+    # prompt_file arg is provided but stdin-mode adapter does not reference it in argv.
+    assert argv == ["opencode", "run"]
 
 
 def test_codex_argv_includes_cwd_and_read_only():
     a = CodexAdapter()
     argv = a.build_argv("do X", "/repo", None)
-    assert argv == ["codex", "exec", "do X", "-C", "/repo", "-s", "read-only"]
-    assert a.uses_prompt_file is False
+    # Prompt on stdin; argv contains only subcommand + flags.
+    assert argv == ["codex", "exec", "-C", "/repo", "-s", "read-only"]
+    assert a.input_mode == "stdin"
     assert a.name == "codex"
 
 
 def test_claude_argv_uses_print_flag():
     a = ClaudeAdapter()
     argv = a.build_argv("summarize", "/repo", None)
-    assert argv == ["claude", "-p", "summarize"]
-    assert a.uses_prompt_file is False
+    assert argv == ["claude", "-p"]
+    assert a.input_mode == "stdin"
     assert a.name == "claude"
 
 
 def test_all_adapters_never_use_shell_true():
-    """Regression: prompts with shell metacharacters must be passed as argv, never shell strings."""
+    """Regression: adapter argv is always a list of strings; prompt goes on stdin."""
     danger = "; rm -rf /; echo pwned"
     for adapter in (OpenCodeAdapter(), CodexAdapter(), ClaudeAdapter()):
         argv = adapter.build_argv(danger, "/tmp", None)
-        assert danger in argv
         assert isinstance(argv, list) and all(isinstance(x, str) for x in argv)
+        # Prompt must NOT be in argv (it flows via stdin) — shell injection surface is zero.
+        assert danger not in argv
 
 
 def test_resolve_cli_unix_returns_bare_name(monkeypatch: pytest.MonkeyPatch):

@@ -104,6 +104,13 @@ def build_prompt_preamble(prompt: str, context_files: list[str], cwd: str) -> st
 class BaseAdapter(ABC):
     name: str
     uses_prompt_file: bool = False
+    # How the prompt is delivered to the worker subprocess:
+    #   "inline" — prompt is a positional argv element (fine for tiny prompts,
+    #              but fails for multi-line/large prompts on Windows argv joining
+    #              and hits OS argv size limits)
+    #   "stdin"  — prompt is piped to worker stdin; argv omits the prompt.
+    #              Preferred for anything larger than a single line.
+    input_mode: str = "inline"
 
     @abstractmethod
     def build_argv(

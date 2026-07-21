@@ -8,6 +8,7 @@ from .base import BaseAdapter, resolve_cli
 class ClaudeAdapter(BaseAdapter):
     name = "claude"
     uses_prompt_file = False
+    input_mode = "stdin"
 
     def build_argv(
         self,
@@ -15,7 +16,7 @@ class ClaudeAdapter(BaseAdapter):
         cwd: str,
         prompt_file: Path | None,
     ) -> list[str]:
-        # claude -p <prompt>  — -p/--print is non-interactive flag, prompt is positional.
+        # claude -p                — non-interactive; prompt piped via stdin.
         # Working dir set via subprocess cwd=.
         # resolve_cli handles Windows .ps1 wrappers (npm-installed CLIs).
-        return resolve_cli("claude") + ["-p", prompt_with_preamble]
+        return resolve_cli("claude") + ["-p"]

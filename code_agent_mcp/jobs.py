@@ -162,12 +162,21 @@ class JobStore:
 
 
 class JobRunner:
-    def __init__(self, job_id: str, argv: list[str], cwd: str, timeout_ms: int, prompt_file: Optional[Path]):
+    def __init__(
+        self,
+        job_id: str,
+        argv: list[str],
+        cwd: str,
+        timeout_ms: int,
+        prompt_file: Optional[Path],
+        input_mode: str = "inline",
+    ):
         self.job_id = job_id
         self.argv = argv
         self.cwd = cwd
         self.timeout_ms = timeout_ms
         self.prompt_file = prompt_file
+        self.input_mode = input_mode
         self.stdout_path = LOGS_DIR / f"{job_id}.stdout"
         self.stderr_path = LOGS_DIR / f"{job_id}.stderr"
         self.proc: Optional[asyncio.subprocess.Process] = None
@@ -177,11 +186,20 @@ class JobRunner:
         _ensure_dirs()
         stdout_f = self.stdout_path.open("wb")
         stderr_f = self.stderr_path.open("wb")
+        # For stdin mode, pipe the prompt file to the worker's stdin. This avoids
+        # argv size limits and multi-line quoting issues (newline-as-terminator
+        # bugs, Windows CreateProcess argv joining) that break large prompts.
+        stdin_f = None
+        if self.input_mode == "stdin" and self.prompt_file is not None and self.prompt_file.exists():
+            stdin_f = self.prompt_file.open("rb")
+            stdin_arg: object = stdin_f
+        else:
+            stdin_arg = asyncio.subprocess.DEVNULL
         try:
             self.proc = await asyncio.create_subprocess_exec(
                 *self.argv,
                 cwd=self.cwd,
-                stdin=asyncio.subprocess.DEVNULL,
+                stdin=stdin_arg,
                 stdout=stdout_f,
                 stderr=stderr_f,
                 env=os.environ.copy(),
@@ -198,6 +216,11 @@ class JobRunner:
         finally:
             stdout_f.close()
             stderr_f.close()
+            if stdin_f is not None:
+                try:
+                    stdin_f.close()
+                except OSError:
+                    pass
             if self.prompt_file is not None:
                 try:
                     self.prompt_file.unlink(missing_ok=True)
@@ -310,13 +333,19 @@ class Scheduler:
                 # Leave pending; the next wake() will retry once the prompt file exists.
                 continue
             adapter = self.adapters[job.agent]
-            prompt_file: Optional[Path] = None
-            if adapter.uses_prompt_file:
-                prompt_file = PROMPTS_DIR / f"{job.job_id}.prompt.md"
-                prompt_file.write_text(prompt_full, encoding="utf-8")
+            # Always write a prompt file so stdin-mode adapters can pipe from it.
+            # (Also serves prompt-file mode adapters; JobRunner unlinks after.)
+            prompt_file: Optional[Path] = PROMPTS_DIR / f"{job.job_id}.prompt.md"
+            prompt_file.write_text(prompt_full, encoding="utf-8")
+            input_mode = getattr(adapter, "input_mode", "inline")
             argv = adapter.build_argv(prompt_full, job.cwd, prompt_file)
             runner = JobRunner(
-                job_id=job.job_id, argv=argv, cwd=job.cwd, timeout_ms=job.timeout_ms, prompt_file=prompt_file,
+                job_id=job.job_id,
+                argv=argv,
+                cwd=job.cwd,
+                timeout_ms=job.timeout_ms,
+                prompt_file=prompt_file,
+                input_mode=input_mode,
             )
             await self.store.mark_running(job.job_id, pid=0)
             task = asyncio.create_task(self._run_and_finalize(runner))

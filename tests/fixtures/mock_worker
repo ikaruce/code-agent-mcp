@@ -18,23 +18,20 @@ set -u
 
 self_name=$(basename "$0")
 
-case "$self_name" in
-  opencode)
-    # $1 = "run", $2 = prompt
-    prompt="${2:-}"
-    ;;
-  codex)
-    # $1 = "exec", $2 = prompt
-    prompt="${2:-}"
-    ;;
-  claude)
-    # $1 = "-p", $2 = prompt
-    prompt="${2:-}"
-    ;;
-  *)
-    prompt="mock:unknown-role:$*"
-    ;;
-esac
+# Prefer stdin (new default: MCP pipes the prompt in on stdin).
+# Fall back to positional argv for backward-compat with legacy inline-mode tests.
+if [ ! -t 0 ]; then
+  prompt=$(cat)
+else
+  case "$self_name" in
+    opencode|codex|claude)
+      prompt="${2:-}"
+      ;;
+    *)
+      prompt="mock:unknown-role:$*"
+      ;;
+  esac
+fi
 
 sleep_s="${CAM_TEST_SLEEP:-0}"
 exit_code="${CAM_TEST_EXIT:-0}"
