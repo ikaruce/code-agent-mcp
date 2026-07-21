@@ -14,6 +14,7 @@ from .adapters.base import (
 )
 from .adapters.claude import ClaudeAdapter
 from .adapters.codex import CodexAdapter
+from .adapters.gemini import GeminiAdapter
 from .adapters.opencode import OpenCodeAdapter
 from .jobs import JobStore, Scheduler, TERMINAL_STATES
 from .telemetry import Telemetry
@@ -27,6 +28,7 @@ def build_adapters() -> dict[str, BaseAdapter]:
         "opencode": OpenCodeAdapter(),
         "codex": CodexAdapter(),
         "claude": ClaudeAdapter(),
+        "gemini": GeminiAdapter(),
     }
 
 

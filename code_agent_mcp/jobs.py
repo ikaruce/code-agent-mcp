@@ -19,7 +19,7 @@ PROMPTS_DIR = STATE_ROOT / "prompts"
 DB_PATH = STATE_ROOT / "state.sqlite"
 
 GLOBAL_CONCURRENCY = 4
-PER_AGENT_CAPS = {"opencode": 4, "codex": 2, "claude": 2}
+PER_AGENT_CAPS = {"opencode": 4, "codex": 2, "claude": 2, "gemini": 2}
 
 TERMINAL_STATES = {"done", "error", "cancelled"}
 SIGKILL_GRACE_SECONDS = 5

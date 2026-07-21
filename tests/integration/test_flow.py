@@ -7,6 +7,7 @@ import pytest
 from code_agent_mcp import jobs as jobs_mod
 from code_agent_mcp.adapters.claude import ClaudeAdapter
 from code_agent_mcp.adapters.codex import CodexAdapter
+from code_agent_mcp.adapters.gemini import GeminiAdapter
 from code_agent_mcp.adapters.opencode import OpenCodeAdapter
 from code_agent_mcp.jobs import JobStore, Scheduler, TERMINAL_STATES
 from code_agent_mcp.telemetry import Telemetry
@@ -17,6 +18,7 @@ def build_test_adapters() -> dict:
         "opencode": OpenCodeAdapter(),
         "codex": CodexAdapter(),
         "claude": ClaudeAdapter(),
+        "gemini": GeminiAdapter(),
     }
 
 
@@ -123,7 +125,7 @@ async def test_all_three_adapters(clean_env, tmp_path):
     scheduler = Scheduler(store=store, adapters=build_test_adapters())
     await scheduler.start()
     try:
-        for agent in ("opencode", "codex", "claude"):
+        for agent in ("opencode", "codex", "claude", "gemini"):
             job = await _dispatch_and_wait(
                 scheduler, store, agent, f"prompt for {agent}", str(tmp_path)
             )
