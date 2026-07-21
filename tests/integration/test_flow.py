@@ -270,6 +270,46 @@ async def test_cancel_terminal_is_noop(clean_env, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_read_output_returns_partial_while_running(clean_env, tmp_path, monkeypatch):
+    """Regression: driver must see accumulated stdout during running state, not only at terminal."""
+    from code_agent_mcp.jobs import LOGS_DIR
+
+    monkeypatch.setenv("CAM_TEST_SLEEP", "3")
+    store = JobStore()
+    scheduler = Scheduler(store=store, adapters=build_test_adapters())
+    await scheduler.start()
+    try:
+        jid = await store.enqueue(
+            agent="opencode", cwd=str(tmp_path),
+            prompt_preview="slow", timeout_ms=15_000,
+        )
+        await scheduler.stage_prompt(jid, "slow")
+        scheduler.wake()
+        # Wait until running
+        for _ in range(60):
+            if (await store.get(jid)).state == "running":
+                break
+            await asyncio.sleep(0.05)
+        assert (await store.get(jid)).state == "running"
+
+        # Simulate a streaming worker by injecting a partial line into the stdout log.
+        (LOGS_DIR / f"{jid}.stdout").open("ab").write(b"partial-progress-marker\n")
+
+        # scheduler.read_output should see the partial line while state is still running.
+        partial_stdout, _ = scheduler.read_output(jid)
+        assert "partial-progress-marker" in partial_stdout
+
+        # Let the job finish so teardown is clean.
+        for _ in range(100):
+            j = await store.get(jid)
+            if j.state in TERMINAL_STATES:
+                break
+            await asyncio.sleep(0.1)
+    finally:
+        await scheduler.stop()
+
+
+@pytest.mark.asyncio
 async def test_restart_recovery_marks_orphans_error(clean_env, tmp_path):
     store = JobStore()
     await store.enqueue(agent="opencode", cwd=str(tmp_path), prompt_preview="orphan", timeout_ms=5_000)

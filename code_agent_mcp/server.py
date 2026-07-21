@@ -106,7 +106,9 @@ def _make_app() -> tuple[FastMCP, JobStore, Scheduler, Telemetry]:
             }
         stdout, stderr = scheduler.read_output(job_id)
         elapsed_ms = _compute_elapsed_ms(job.dispatched_at, job.finished_at)
-        result: Optional[str] = stdout if job.state in TERMINAL_STATES else None
+        # Return current stdout regardless of state — driver can see partial
+        # progress while running. State field indicates whether it is final.
+        result: Optional[str] = stdout if stdout else None
 
         # Record telemetry finish on first observation of terminal state.
         if job.state in TERMINAL_STATES and job.finished_at is not None:
@@ -176,7 +178,9 @@ def _make_app() -> tuple[FastMCP, JobStore, Scheduler, Telemetry]:
 
         stdout, stderr = scheduler.read_output(job_id)
         elapsed_ms = _compute_elapsed_ms(job.dispatched_at, job.finished_at)
-        result: Optional[str] = stdout if job.state in TERMINAL_STATES else None
+        # Return current stdout regardless of state — driver can see partial
+        # progress while running. State field indicates whether it is final.
+        result: Optional[str] = stdout if stdout else None
 
         if job.state in TERMINAL_STATES and job.finished_at is not None:
             telemetry.record_finish(
