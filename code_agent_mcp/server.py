@@ -97,7 +97,12 @@ def _make_app() -> tuple[FastMCP, JobStore, Scheduler, Telemetry]:
 
     @app.tool()
     async def poll(job_id: str) -> dict[str, Any]:
-        """Poll job state. Returns {state, result, stderr, elapsed_ms, exit_code}."""
+        """Poll job state. Returns {state, is_terminal, result, stderr, elapsed_ms, exit_code, next_action}.
+
+        IMPORTANT for drivers: check `is_terminal`. When `is_terminal=false` the job
+        is still in progress — the response is NOT a failure. Call `wait(job_id)`
+        (preferred, blocks server-side) or `poll(job_id)` again to keep watching.
+        """
         job = await store.get(job_id)
         if job is None:
             return {
@@ -111,9 +116,10 @@ def _make_app() -> tuple[FastMCP, JobStore, Scheduler, Telemetry]:
         # Return current stdout regardless of state — driver can see partial
         # progress while running. State field indicates whether it is final.
         result: Optional[str] = stdout if stdout else None
+        is_terminal = job.state in TERMINAL_STATES
 
         # Record telemetry finish on first observation of terminal state.
-        if job.state in TERMINAL_STATES and job.finished_at is not None:
+        if is_terminal and job.finished_at is not None:
             telemetry.record_finish(
                 job_id=job_id,
                 final_state=job.state,
@@ -121,12 +127,22 @@ def _make_app() -> tuple[FastMCP, JobStore, Scheduler, Telemetry]:
                 result_len=len(stdout) if stdout else 0,
             )
 
+        next_action = (
+            f"Job is complete (state={job.state}). No further action needed."
+            if is_terminal
+            else f"Job still {job.state}. This is NOT a failure. "
+                 f"Call wait(job_id={job_id!r}) to keep watching (recommended) "
+                 f"or poll(job_id={job_id!r}) again after a short delay."
+        )
+
         return {
             "state": job.state,
+            "is_terminal": is_terminal,
             "result": result,
             "stderr": stderr if stderr else None,
             "elapsed_ms": elapsed_ms,
             "exit_code": job.exit_code,
+            "next_action": next_action,
         }
 
     @app.tool()
@@ -154,9 +170,12 @@ def _make_app() -> tuple[FastMCP, JobStore, Scheduler, Telemetry]:
     async def wait(job_id: str, timeout_ms: int = 60_000) -> dict[str, Any]:
         """Block server-side until job reaches a terminal state or timeout expires.
 
-        Returns the same shape as poll(). Reduces driver-side polling cost — one wait call
-        replaces N poll calls. If timeout hits before completion, returns the current
-        (non-terminal) state; caller may wait() again.
+        Returns {state, is_terminal, result, stderr, elapsed_ms, exit_code, next_action}.
+
+        IMPORTANT for drivers: A wait() call that hits its `timeout_ms` before the
+        job finishes returns `is_terminal=false`. This is NOT a failure or timeout
+        error — the job is still running. Simply call wait(job_id) again to keep
+        waiting. Only stop when `is_terminal=true` (state is done/error/cancelled).
         """
         job = await store.get(job_id)
         if job is None:
@@ -183,8 +202,9 @@ def _make_app() -> tuple[FastMCP, JobStore, Scheduler, Telemetry]:
         # Return current stdout regardless of state — driver can see partial
         # progress while running. State field indicates whether it is final.
         result: Optional[str] = stdout if stdout else None
+        is_terminal = job.state in TERMINAL_STATES
 
-        if job.state in TERMINAL_STATES and job.finished_at is not None:
+        if is_terminal and job.finished_at is not None:
             telemetry.record_finish(
                 job_id=job_id,
                 final_state=job.state,
@@ -192,12 +212,22 @@ def _make_app() -> tuple[FastMCP, JobStore, Scheduler, Telemetry]:
                 result_len=len(stdout) if stdout else 0,
             )
 
+        next_action = (
+            f"Job is complete (state={job.state}). No further action needed."
+            if is_terminal
+            else f"wait() reached its {timeout_ms}ms server-side timeout while the "
+                 f"job is still {job.state}. This is NOT a failure. Call "
+                 f"wait(job_id={job_id!r}) again to keep waiting for completion."
+        )
+
         return {
             "state": job.state,
+            "is_terminal": is_terminal,
             "result": result,
             "stderr": stderr if stderr else None,
             "elapsed_ms": elapsed_ms,
             "exit_code": job.exit_code,
+            "next_action": next_action,
         }
 
     return app, store, scheduler, telemetry
