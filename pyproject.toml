@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 license = { text = "Proprietary — internal use only" }
 authors = [{ name = "blue" }]
 dependencies = [
-    "mcp>=1.2.0",
+    "mcp>=1.2.0,<2",
 ]
 
 [project.scripts]
